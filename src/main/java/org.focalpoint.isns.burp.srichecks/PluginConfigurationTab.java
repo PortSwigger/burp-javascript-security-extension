@@ -30,6 +30,8 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.JButton;
 
+import burp.IBurpExtenderCallbacks;
+
 import java.io.File;
 
 public class PluginConfigurationTab extends JPanel implements ActionListener{
@@ -48,10 +50,13 @@ public class PluginConfigurationTab extends JPanel implements ActionListener{
 	private JTextField iocCountField;
 	private JButton openIocFileButton;
 	private JFileChooser iocChooser;
+
+	private IBurpExtenderCallbacks extensionCallbacks;
 	
 	private final static Integer MAX_FILE_FIELD_COLS = 60;
 	private final static Integer MAX_DELAY_COLS = 3;
 	private final static Integer MAX_IOC_FIELD_COLS = 3;
+	private final static String SETTING_CHROMEDRIVER_PATH = "jssecurity.chromedriverpath";
 	private IoCChecker myIocChecker;
 
 	private DriverServiceManager myServiceManager;
@@ -82,12 +87,19 @@ public class PluginConfigurationTab extends JPanel implements ActionListener{
 	}
 
 	/**
+	 * Set the callbacks object so configurations can be updated by the panel
+	 * @param cb The extensions call back object
+	 */
+	public void setCallbacks(IBurpExtenderCallbacks cb){
+		extensionCallbacks = cb;
+	}
+
+	/**
 	 * Set the driver service manager, linking the two so that the driver path can be modified
 	 * @param sm A driver service manager object to use
 	 */
 	public void setDriverServiceManager(DriverServiceManager sm){
 		myServiceManager = sm;
-		//myServiceManager.setDriverPath(getDriverPath());
 	}
 
 
@@ -105,15 +117,21 @@ public class PluginConfigurationTab extends JPanel implements ActionListener{
 
 		// Driver chooser wiring
 		driverChooser = new JFileChooser();
-		// Try to set a default based on a standard. Linux install location
-		File defaultDriver = new File("/usr/lib/chromium-browser/chromedriver");
-		driverChooser.setSelectedFile(defaultDriver);
 
 		driverChooserLabel = new JLabel("Select the chromedriver to use:");
 		layout.putConstraint(SpringLayout.NORTH, driverChooserLabel, 5, SpringLayout.SOUTH, titleLabel);
 		layout.putConstraint(SpringLayout.WEST, driverChooserLabel, 5, SpringLayout.WEST, getInstance());
-
-		filePathField = new JTextField(getDriverPath());
+		
+		// Try to set a default based on the settings
+		if (extensionCallbacks.loadExtensionSetting(SETTING_CHROMEDRIVER_PATH) != null){
+			filePathField = new JTextField(extensionCallbacks.loadExtensionSetting(SETTING_CHROMEDRIVER_PATH));
+			File settingDriverPath = new File(extensionCallbacks.loadExtensionSetting(SETTING_CHROMEDRIVER_PATH));
+			driverChooser.setSelectedFile(settingDriverPath);
+		} else {
+			filePathField = new JTextField("None");
+		}
+		
+		
 		filePathField.setColumns(MAX_FILE_FIELD_COLS);
 		filePathField.setEditable(false);
 		layout.putConstraint(SpringLayout.WEST, filePathField, 5, SpringLayout.EAST, driverChooserLabel);
@@ -178,7 +196,7 @@ public class PluginConfigurationTab extends JPanel implements ActionListener{
 	}
 	
 	/**
-	 * Get the driver file path for the chromedriver which should be used by Seleniu, from the GUI
+	 * Get the driver file path for the chromedriver which should be used by Selenium, from the GUI
 	 * @return a String which is the path to the chromedriver binary picked by the user in the GUI
 	 */
 	public String getDriverPath() {
@@ -197,6 +215,7 @@ public class PluginConfigurationTab extends JPanel implements ActionListener{
 				System.out.println("[JS-SRI][*] Selected " + getDriverPath() + " as the chrome-driver.");
 				filePathField.setText(getDriverPath());
 				myServiceManager.setDriverPath(getDriverPath());
+				extensionCallbacks.saveExtensionSetting(SETTING_CHROMEDRIVER_PATH, getDriverPath());
 			}
 		}
 		// Handle the open IOC Button

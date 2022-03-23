@@ -38,29 +38,46 @@ public class DriverServiceManager {
 
     private String chromeDriverFilePath;
     private static String DEFAULT_DRIVER_PATH = "/usr/lib/chromium-browser/chromedriver";
+    private final static String SETTING_CHROMEDRIVER_PATH = "jssecurity.chromedriverpath";
     private ChromeDriverService service;
+    private IBurpExtenderCallbacks myCallbacks;
 
     public DriverServiceManager(){
-        chromeDriverFilePath = DEFAULT_DRIVER_PATH;
-        startDriverService();
+        // Just default to the default driver path
+        chromeDriverFilePath = null;
+    }
+
+    public void setCallbacks(IBurpExtenderCallbacks cb){
+        myCallbacks = cb;
+        // Get the filepath setting
+        if (myCallbacks.loadExtensionSetting(SETTING_CHROMEDRIVER_PATH) != null){
+			chromeDriverFilePath = myCallbacks.loadExtensionSetting(SETTING_CHROMEDRIVER_PATH);
+		}
     }
 
 
     public void startDriverService(){
-        try{
-            // https://seleniumhq.github.io/selenium/docs/api/java/
-            File driverFile;
-            driverFile = new File(chromeDriverFilePath);
-            service = new ChromeDriverService.Builder().usingDriverExecutable(driverFile).usingAnyFreePort().build();
-            service.start();
-        }
-        catch (IOException e){
-            System.err.println("[JS-SRI][-] Could not start chromedriver service");
+        if (chromeDriverFilePath != null) {
+            try{
+                // https://seleniumhq.github.io/selenium/docs/api/java/
+                File driverFile;
+                driverFile = new File(chromeDriverFilePath);
+                service = new ChromeDriverService.Builder().usingDriverExecutable(driverFile).usingAnyFreePort().build();
+                service.start();
+            }
+            catch (IOException e){
+                System.err.println("[JS-SRI][-] Could not start chromedriver service");
+            }
+            catch (IllegalStateException e){
+                System.err.println("[JS-SRI][-] Could not start chromedriver service");
+            }
         }
     }
 
     public void stopDriverService(){
-        service.stop();
+        if (service != null) {
+            service.stop();
+        }
     }
 
     public ChromeDriverService getService(){
@@ -68,16 +85,28 @@ public class DriverServiceManager {
     }
 
     private void reloadIfRunning(){
-        if (service.isRunning()){
-            // Restart it
-            stopDriverService();
-            startDriverService();
+        if (service != null){
+            if (service.isRunning()){
+                // Restart it
+                stopDriverService();
+                startDriverService();
+            }
         }
+    }
+
+    private void reload(){
+        if (service != null){
+            if (service.isRunning()){
+                stopDriverService();
+            }
+        }
+        startDriverService();
     }
 
     public void setDriverPath(String path){
         chromeDriverFilePath = path;
-        reloadIfRunning();
+        System.out.println("[JS-SRI] Set chromedriver path to " + path);
+        reload();
     }
 
 }
